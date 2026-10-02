@@ -107,8 +107,8 @@ setup_env() {
         read -p "STATIC_QR (string QR dari GoMerch): " STATIC_QR
     done
     
-    read -p "PORT [2007]: " PORT
-    PORT=${PORT:-2007}
+    read -p "PORT [2234]: " PORT
+    PORT=${PORT:-2234}
     
     read -p "BASE_AMOUNT [1000]: " BASE_AMOUNT
     BASE_AMOUNT=${BASE_AMOUNT:-1000}
@@ -148,7 +148,7 @@ start_pm2() {
 # Show info
 show_info() {
     PORT=$(grep ^PORT= .env | cut -d'=' -f2)
-    PORT=${PORT:-2007}
+    PORT=${PORT:-2234}
     
     echo
     echo "╔══════════════════════════════════════════════════════════════╗"
