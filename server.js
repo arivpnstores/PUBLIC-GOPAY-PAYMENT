@@ -1,9 +1,11 @@
 require('dotenv').config();
 const express = require('express');
 const axios = require('axios');
+const fs = require('fs');
+const path = require('path');
 
 const app = express();
-const PORT = process.env.PORT || 2234;
+const PORT = process.env.PORT || 2007;
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -16,6 +18,7 @@ const STATIC_QR = process.env.STATIC_QR;
 
 const QRIS_TIMEOUT_MS = 15 * 60 * 1000;
 const POLL_INTERVAL_MS = 1500;
+const CHECKS_FILE = path.join(__dirname, 'checks.json');
 
 function validateConfig() {
   const missing = [];
@@ -40,6 +43,35 @@ const state = {
 };
 
 const activeChecks = new Map();
+
+function loadChecks() {
+  try {
+    if (fs.existsSync(CHECKS_FILE)) {
+      const data = fs.readFileSync(CHECKS_FILE, 'utf8');
+      const parsed = JSON.parse(data);
+      const now = Date.now;
+      for (const [checkId, checkData] of Object.entries(parsed)) {
+        if (now() - checkData.createdAt < QRIS_TIMEOUT_MS) {
+          activeChecks.set(checkId, checkData);
+        }
+      }
+      console.log(`[GoMerch] Loaded ${activeChecks.size} checks from ${CHECKS_FILE}`);
+    }
+  } catch (e) {
+    console.error('[GoMerch] Gagal load checks.json:', e.message);
+  }
+}
+
+function saveChecks() {
+  try {
+    const data = Object.fromEntries(activeChecks);
+    fs.writeFileSync(CHECKS_FILE, JSON.stringify(data, null, 2));
+  } catch (e) {
+    console.error('[GoMerch] Gagal save checks.json:', e.message);
+  }
+}
+
+loadChecks();
 
 function delay(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
@@ -183,6 +215,7 @@ app.get('/createqris/amount=:amount', async (req, res) => {
       startTime,
       createdAt: Date.now()
     });
+    saveChecks();
 
     res.json({
       success: true,
@@ -218,6 +251,7 @@ app.get('/cekpembayaran/:checkId', async (req, res) => {
 
     if (result.status === 'PAID') {
       activeChecks.delete(checkId);
+      saveChecks();
       return res.json({
         success: true,
         status: 'PAID',
@@ -256,15 +290,19 @@ app.get('/cekpembayaran', async (req, res) => {
 
 setInterval(() => {
   const now = Date.now();
+  let changed = false;
   for (const [checkId, data] of activeChecks.entries()) {
     if (now - data.createdAt > QRIS_TIMEOUT_MS) {
       activeChecks.delete(checkId);
+      changed = true;
     }
   }
+  if (changed) saveChecks();
 }, 60000);
 
 app.listen(PORT, () => {
   console.log(`[GoMerch] Server berjalan di http://localhost:${PORT}`);
   console.log(`[GoMerch] Endpoint create QRIS: http://localhost:${PORT}/createqris/amount=1000`);
   console.log(`[GoMerch] Endpoint cek pembayaran: http://localhost:${PORT}/cekpembayaran/:checkId`);
+  console.log(`[GoMerch] Persistensi: ${CHECKS_FILE}`);
 });
