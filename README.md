@@ -190,7 +190,6 @@ setTimeout(() => clearInterval(interval), 15 * 60 * 1000);
 | `REFRESH_TOKEN` | Ya | JWT Refresh Token |
 | `STATIC_QR` | Ya | Static QR string dari GoMerch |
 | `PORT` | Tidak | Port server (default: 2007) |
-| `BASE_AMOUNT` | Tidak | Base amount untuk unique code (default: 1000) |
 
 Copy `.env.example` ke `.env` dan isi valuenya.
 

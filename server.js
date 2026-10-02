@@ -13,7 +13,6 @@ const MERCHANT_ID = process.env.MERCHANT_ID;
 const ACCESS_TOKEN = process.env.ACCESS_TOKEN;
 const REFRESH_TOKEN = process.env.REFRESH_TOKEN;
 const STATIC_QR = process.env.STATIC_QR;
-const BASE_AMOUNT = parseInt(process.env.BASE_AMOUNT) || 1000;
 
 const QRIS_TIMEOUT_MS = 15 * 60 * 1000;
 const POLL_INTERVAL_MS = 1500;
