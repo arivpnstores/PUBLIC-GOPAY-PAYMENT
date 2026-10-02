@@ -36,7 +36,7 @@ cp .env.example .env
 node server.js
 ```
 
-Server berjalan di `http://localhost:2007`
+Server berjalan di `http://localhost:2234`
 
 ---
 
@@ -62,7 +62,7 @@ Server berjalan di `http://localhost:2007`
     "qr_url": "https://api.qrserver.com/...",
     "qr_string": "00020101021126610014COM.GO-JEK...",
     "check_id": "check_170929364739_73itqwsku",
-    "check_url": "http://localhost:2007/cekpembayaran/check_170929364739_73itqwsku",
+    "check_url": "http://localhost:2234/cekpembayaran/check_170929364739_73itqwsku",
     "start_time": "2026-10-02T08:14:08.773Z",
     "timeout_minutes": 15
   }
@@ -71,9 +71,9 @@ Server berjalan di `http://localhost:2007`
 
 **Contoh:**
 ```bash
-curl http://localhost:2007/createqris/amount=1000
-curl http://localhost:2007/createqris/amount=5000
-curl http://localhost:2007/createqris/amount=25000
+curl http://localhost:2234/createqris/amount=1000
+curl http://localhost:2234/createqris/amount=5000
+curl http://localhost:2234/createqris/amount=25000
 ```
 
 ---
@@ -114,7 +114,7 @@ curl http://localhost:2007/createqris/amount=25000
 
 **Contoh:**
 ```bash
-curl http://localhost:2007/cekpembayaran/check_170929364739_73itqwsku
+curl http://localhost:2234/cekpembayaran/check_170929364739_73itqwsku
 ```
 
 ---
@@ -145,13 +145,13 @@ pm2 startup                   # Auto-start saat reboot VPS
 
 ```javascript
 async function createPayment(amount) {
-  const res = await fetch(`http://localhost:2007/createqris/amount=${amount}`);
+  const res = await fetch(`http://localhost:2234/createqris/amount=${amount}`);
   const data = await res.json();
   return data.data; // { check_id, qr_url, amount, ... }
 }
 
 async function checkPayment(checkId) {
-  const res = await fetch(`http://localhost:2007/cekpembayaran/${checkId}`);
+  const res = await fetch(`http://localhost:2234/cekpembayaran/${checkId}`);
   return res.json();
 }
 
@@ -189,7 +189,7 @@ setTimeout(() => clearInterval(interval), 15 * 60 * 1000);
 | `ACCESS_TOKEN` | Ya | JWT Access Token |
 | `REFRESH_TOKEN` | Ya | JWT Refresh Token |
 | `STATIC_QR` | Ya | Static QR string dari GoMerch |
-| `PORT` | Tidak | Port server (default: 2007) |
+| `PORT` | Tidak | Port server (default: 2234) |
 
 Copy `.env.example` ke `.env` dan isi valuenya.
 
