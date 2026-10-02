@@ -2,13 +2,7 @@
 
 Local server untuk generate QRIS dan cek status pembayaran GoPay.
 
-## 🚀 Install di VPS (One-liner)
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/arivpnstores/PUBLIC-GOPAY-PAYMENT/master/install.sh | bash
-```
-
-Atau manual:
+## 🚀 Install di VPS
 
 ```bash
 git clone https://github.com/arivpnstores/PUBLIC-GOPAY-PAYMENT.git
