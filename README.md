@@ -2,19 +2,41 @@
 
 Local server untuk generate QRIS dan cek status pembayaran GoPay.
 
-## Instalasi
+## 🚀 Install di VPS (One-liner)
 
 ```bash
-npm install
+curl -fsSL https://raw.githubusercontent.com/arivpnstores/PUBLIC-GOPAY-PAYMENT/master/install.sh | bash
 ```
 
-## Menjalankan Server
+Atau manual:
 
 ```bash
+git clone https://github.com/arivpnstores/PUBLIC-GOPAY-PAYMENT.git
+cd PUBLIC-GOPAY-PAYMENT
+chmod +x install.sh
+./install.sh
+```
+
+**Yang dilakukan installer:**
+- ✅ Clone repo / pull latest
+- ✅ `npm install` dependencies
+- ✅ Prompt interaktif isi `.env` (validasi wajib)
+- ✅ Start server dengan **PM2** (auto-restart, logging, monitoring)
+
+---
+
+## Instalasi Manual (Local Development)
+
+```bash
+git clone https://github.com/arivpnstores/PUBLIC-GOPAY-PAYMENT.git
+cd PUBLIC-GOPAY-PAYMENT
+npm install
+cp .env.example .env
+# Edit .env isi konfigurasi GoMerch
 node server.js
 ```
 
-Server berjalan di `http://localhost:2234`
+Server berjalan di `http://localhost:2007`
 
 ---
 
@@ -40,7 +62,7 @@ Server berjalan di `http://localhost:2234`
     "qr_url": "https://api.qrserver.com/...",
     "qr_string": "00020101021126610014COM.GO-JEK...",
     "check_id": "check_170929364739_73itqwsku",
-    "check_url": "http://localhost:2234/cekpembayaran/check_170929364739_73itqwsku",
+    "check_url": "http://localhost:2007/cekpembayaran/check_170929364739_73itqwsku",
     "start_time": "2026-10-02T08:14:08.773Z",
     "timeout_minutes": 15
   }
@@ -49,9 +71,9 @@ Server berjalan di `http://localhost:2234`
 
 **Contoh:**
 ```bash
-curl http://localhost:2234/createqris/amount=1000
-curl http://localhost:2234/createqris/amount=5000
-curl http://localhost:2234/createqris/amount=25000
+curl http://localhost:2007/createqris/amount=1000
+curl http://localhost:2007/createqris/amount=5000
+curl http://localhost:2007/createqris/amount=25000
 ```
 
 ---
@@ -92,7 +114,7 @@ curl http://localhost:2234/createqris/amount=25000
 
 **Contoh:**
 ```bash
-curl http://localhost:2234/cekpembayaran/check_170929364739_73itqwsku
+curl http://localhost:2007/cekpembayaran/check_170929364739_73itqwsku
 ```
 
 ---
@@ -106,17 +128,30 @@ curl http://localhost:2234/cekpembayaran/check_170929364739_73itqwsku
 
 ---
 
+## PM2 Management (Production)
+
+```bash
+pm2 status                    # Cek status semua app
+pm2 logs gopay-qris-server    # Lihat log real-time
+pm2 restart gopay-qris-server # Restart app
+pm2 stop gopay-qris-server    # Stop app
+pm2 monit                     # Dashboard monitoring
+pm2 startup                   # Auto-start saat reboot VPS
+```
+
+---
+
 ## Contoh Implementasi Frontend (JavaScript)
 
 ```javascript
 async function createPayment(amount) {
-  const res = await fetch(`http://localhost:2234/createqris/amount=${amount}`);
+  const res = await fetch(`http://localhost:2007/createqris/amount=${amount}`);
   const data = await res.json();
   return data.data; // { check_id, qr_url, amount, ... }
 }
 
 async function checkPayment(checkId) {
-  const res = await fetch(`http://localhost:2234/cekpembayaran/${checkId}`);
+  const res = await fetch(`http://localhost:2007/cekpembayaran/${checkId}`);
   return res.json();
 }
 
@@ -145,9 +180,33 @@ setTimeout(() => clearInterval(interval), 15 * 60 * 1000);
 
 ---
 
+## Konfigurasi (.env)
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `BASE_URL` | Ya | GoMerch API URL |
+| `MERCHANT_ID` | Ya | Merchant ID dari GoMerch |
+| `ACCESS_TOKEN` | Ya | JWT Access Token |
+| `REFRESH_TOKEN` | Ya | JWT Refresh Token |
+| `STATIC_QR` | Ya | Static QR string dari GoMerch |
+| `PORT` | Tidak | Port server (default: 2007) |
+| `BASE_AMOUNT` | Tidak | Base amount untuk unique code (default: 1000) |
+
+Copy `.env.example` ke `.env` dan isi valuenya.
+
+---
+
 ## Catatan
 
 - QRIS berlaku **15 menit** (timeout)
 - Amount yang dikirim ke user sudah ditambah **unique code** (100-200) untuk identifikasi
 - Server otomatis hapus `check_id` yang expired
 - Token akses otomatis di-refresh jika expired
+- `.env` tidak di-commit ke git (ada di `.gitignore`)
+
+---
+
+## Repository
+
+- **GitHub:** https://github.com/arivpnstores/PUBLIC-GOPAY-PAYMENT
+- **Install Script:** https://github.com/arivpnstores/PUBLIC-GOPAY-PAYMENT/blob/master/install.sh
