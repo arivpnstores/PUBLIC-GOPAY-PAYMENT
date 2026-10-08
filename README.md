@@ -322,6 +322,21 @@ Copy `.env.example` ke `.env` dan isi valuenya.
 
 ---
 
+## 🔄 Perubahan Terbaru (Internal / Backend)
+
+| Versi | Tanggal | Perubahan |
+|-------|---------|-----------|
+| **1.1.0** | 2026-10-08 | **Auto-refresh token** saat response mutasi mengandung "Invalid/Expired token" (meski `success:true`). Menghindari 500/UNPAID loop saat token GoMerch expired. |
+| | | **Error handling `getMutasi` ditingkatkan**: validasi statusCode, format response, log raw response keys + full data untuk debugging. |
+| | | **Error reporting `cekpembayaran`**: upstream error (token expired, network, format response) sekarang balas `UNPAID` (HTTP 200) bukan `ERROR` (500) — bot tetap polling, alasan error tetap tercatat di log server. |
+| | | **Log detail `checkPayment`**: log `UNPAID` dengan alasan spesifik (token expired, format response invalid, dll) — memudahin debug tanpa cek log server terpisah. |
+| | | **QR image delivery**: bot sekarang **download + kirim gambar QR** (`replyWithPhoto`) bukan cuma link teks — user langsung scan, fallback ke link kalau download gagal. |
+| | | **404 handling di bot**: QRIS yang tidak ditemukan/dropped (mis. API restart) → bot hapus deposit + notif user "QRIS tidak berlaku, silakan ulangi" — tidak stuck error 404 tiap 3 detik. |
+| | | **Backup otomatis**: 1 file `backup-<timestamp>.tar.gz` (semua DB digabung), auto **24 jam**, **tidak di startup**, auto-clean file lama (keep 3 terbaru). Manual backup via Admin Hub. |
+| | | **Expired notification fix**: cek silang ke `list_accounts` sebelum notif expired — akun yang sudah diperpanjang (list_accounts aktif & expired masa depan) tidak dikirim notif "expired" lagi. |
+
+---
+
 ## Repository
 
 - **GitHub:** https://github.com/arivpnstores/PUBLIC-GOPAY-PAYMENT

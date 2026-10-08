@@ -154,6 +154,31 @@ async function getMutasi(start_time = null, end_time = null) {
       }
       return { success: false, message: 'Token expired dan gagal refresh!' };
     }
+    if (statusCode !== 200) {
+      return { success: false, message: `Mutasi API status ${statusCode}: ${JSON.stringify(data).slice(0, 200)}` };
+    }
+    // Debug: log raw response structure
+    console.log('[GoMerch] Mutasi raw response keys:', data ? Object.keys(data) : 'null', '| statusCode:', statusCode);
+    
+    // Handle case where API returns success:true but data contains error (expired token)
+    if (data && data.success === true && data.data && typeof data.data === 'object' && data.data.message && /Invalid|Expired|expired|token/i.test(data.data.message)) {
+      console.log('[GoMerch] Token expired detected in response, attempting refresh...');
+      const ok = await doRefreshToken();
+      if (ok) {
+        body.access_token = state.accessToken;
+        try {
+          return await apiPost('/gomerch/api/mutasi', body);
+        } catch (e2) {
+          return { success: false, message: e2.message };
+        }
+      }
+      return { success: false, message: 'Token expired dan gagal refresh!' };
+    }
+    
+    if (!data || !data.data || !Array.isArray(data.data.transactions)) {
+      console.log('[GoMerch] Mutasi invalid format - full data:', JSON.stringify(data).slice(0, 500));
+      return { success: false, message: 'Format response mutasi tidak valid (kosong atau bukan object)' };
+    }
     return data;
   } catch (e) {
     return { success: false, message: e.message };
