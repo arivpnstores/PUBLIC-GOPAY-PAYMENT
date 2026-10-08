@@ -107,12 +107,13 @@ curl "http://192.168.1.5:2234/api/v1/health?deep=1"
 ```json
 {
   "success": true,
-  "message": "QRIS berhasil dibuat",
   "data": {
     "amount": 1186,
     "baseAmount": 1000,
     "uniqueNumber": 186,
-    "qr_url": "https://api.qrserver.com/...",
+    "qr_image": "http://localhost:2234/check_170929364739_73itqwsku.jpg",
+    "qr_url": "http://localhost:2234/check_170929364739_73itqwsku.jpg",
+    "qris_string": "00020101021126610014COM.GO-JEK...",
     "qr_string": "00020101021126610014COM.GO-JEK...",
     "check_id": "check_170929364739_73itqwsku",
     "check_url": "http://localhost:2234/cekpembayaran/check_170929364739_73itqwsku",
@@ -121,6 +122,9 @@ curl "http://192.168.1.5:2234/api/v1/health?deep=1"
   }
 }
 ```
+
+`qr_url`/`qr_image` menunjuk ke endpoint gambar QR di server ini sendiri (dirender lokal,
+bukan layanan pihak ketiga).
 
 **Contoh:**
 ```bash
@@ -133,7 +137,7 @@ curl http://localhost:2234/createqris/amount=25000
 
 ### 2. Gambar QR (PNG)
 
-**GET** `/<checkId>.jpg` (alias: `/qris/<checkId>.jpg`)
+**GET** `/<checkId>.jpg` (alias: `/qris/<checkId>.jpg`, ekstensi `.jpeg`/`.png` juga diterima)
 
 Gambar QR dirender **di server sendiri** dari `qr_string` — tidak bergantung pada `api.qrserver.com` atau layanan pihak ketiga lain.
 
@@ -173,18 +177,43 @@ Berlaku selama `check_id` masih aktif (15 menit, atau sampai status `PAID`).
   "message": "Ditemukan: qr_muqord3952a01a7c",
   "transaction": { ... }
 }
+```
 
-// Error
+Kasus lain:
+
+```json
+// Check ID tidak ditemukan / expired → HTTP 404
 {
   "success": false,
-  "status": "ERROR",
-  "message": "Gagal ambil mutasi."
+  "message": "Check ID tidak ditemukan atau sudah expired"
+}
+
+// Error dari GoMerch / exception → dilaporkan sebagai UNPAID (HTTP 200)
+{
+  "success": true,
+  "status": "UNPAID",
+  "message": "Gagal ambil mutasi.",
+  "check_id": "check_170929364739_73itqwsku"
 }
 ```
+
+> Error upstream sengaja dilaporkan sebagai `UNPAID` (bukan status `ERROR`) supaya bot
+>/frontend tetap lanjut polling sampai timeout, bukan berhenti karena false alarm.
 
 **Contoh:**
 ```bash
 curl http://localhost:2234/cekpembayaran/check_170929364739_73itqwsku
+```
+
+**GET** `/cekpembayaran` (tanpa `checkId`) hanya balas info/petunjuk pemakaian endpoint —
+berguna buat cek apakah route terdaftar:
+
+```json
+{
+  "success": true,
+  "message": "Gunakan endpoint /cekpembayaran/:checkId untuk mengecek status pembayaran",
+  "example": "http://localhost:2234/cekpembayaran/check_1234567890_abc123"
+}
 ```
 
 ---
@@ -194,7 +223,7 @@ curl http://localhost:2234/cekpembayaran/check_170929364739_73itqwsku
 1. **Generate QRIS** → dapatkan `check_id` dan `qr_url`
 2. **Tampilkan QR** ke user (via `qr_url` atau `qr_string`)
 3. **Polling cek pembayaran** setiap 1-2 detik menggunakan `check_id`
-4. **Stop polling** saat status `PAID` atau timeout 15 menit
+4. **Stop polling** saat status `PAID`, response `404` (check expired), atau timeout 15 menit
 
 ---
 
@@ -245,13 +274,14 @@ console.log('Amount:', payment.amount);
 const interval = setInterval(async () => {
   const result = await checkPayment(payment.check_id);
   console.log('Status:', result.status);
-  
+
   if (result.status === 'PAID') {
     clearInterval(interval);
     console.log('Pembayaran berhasil!', result.transaction);
-  } else if (result.status === 'ERROR') {
+  } else if (result.success === false) {
+    // 404: check_id expired / tidak dikenal -> stop polling
     clearInterval(interval);
-    console.error('Error:', result.message);
+    console.error('Check ID tidak ditemukan:', result.message);
   }
 }, 2000);
 
@@ -285,6 +315,8 @@ Copy `.env.example` ke `.env` dan isi valuenya.
 - Gambar QR dirender lokal (900x900 PNG, ECC `M`) — tidak ada ketergantungan ke QR generator pihak ketiga
 - Amount yang dikirim ke user sudah ditambah **unique code** (100-200) untuk identifikasi
 - Server otomatis hapus `check_id` yang expired
+- Check aktif dipersistensi ke `checks.json` — kalau server restart (mis. via PM2),
+  check yang masih hidup di-load ulang; yang sudah lewat 15 menit langsung dibuang saat load
 - Token akses otomatis di-refresh jika expired
 - `.env` tidak di-commit ke git (ada di `.gitignore`)
 
