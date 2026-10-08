@@ -32,9 +32,68 @@ node server.js
 
 Server berjalan di `http://localhost:2234`
 
+QRIS bisa dipindai dari HP user tanpa domain/Cloudflare Tunnel:
+- Biarkan `PUBLIC_URL` kosong → server otomatis memakai **IP LAN** server
+  (contoh `http://192.168.1.5:2234`), jadi HP di jaringan yang sama bisa mengaksesnya.
+- Isi `PUBLIC_URL` hanya kalau kamu punya domain publik sendiri (mis. sudah ada server
+  web / reverse proxy).
+
 ---
 
 ## Endpoint
+
+### 0. Health Check
+
+**GET** `/api/v1/health` (alias: `/health`, `/api/health`)
+
+Endpoint buat monitoring (UptimeRobot, Cloudflare, PM2, dsb). Selalu balas `200`
+selama proses server hidup, tanpa memanggil API GoMerch — jadi aman dipakai sebagai
+heartbeat.
+
+```bash
+curl http://192.168.1.5:2234/api/v1/health
+```
+
+```json
+{
+  "status": "ok",
+  "service": "gopay-qris-server",
+  "version": "1.0.0",
+  "timestamp": "2026-10-03T04:37:16.282Z",
+  "started_at": "2026-10-03T04:37:13.382Z",
+  "uptime_seconds": 3600,
+  "active_checks": 2,
+  "memory_mb": { "rss": 66.46, "heap_total": 20.42, "heap_used": 11.12 },
+  "config": {
+    "base_url": "https://qris.adijayavpnpedia.cloud",
+    "merchant_id": "G44****934",
+    "static_qr": "set",
+    "public_url": null,
+    "port": "2234"
+  },
+  "token": { "valid": true, "expires_at": "...", "seconds_remaining": 82800 },
+  "endpoints": {
+    "health": "/api/v1/health",
+    "createQris": "/createqris/amount=:amount",
+    "checkPayment": "/cekpembayaran/:checkId",
+    "qrImage": "/<checkId>.jpg"
+  }
+}
+```
+
+Tambah `?deep=1` untuk sekaligus nge-ping server GoMerch (`BASE_URL`):
+
+```bash
+curl "http://192.168.1.5:2234/api/v1/health?deep=1"
+```
+
+```json
+"upstream": { "reachable": true, "http_status": 200, "latency_ms": 312 }
+```
+
+> Route yang tidak dikenal sekarang balas JSON `404` (bukan halaman HTML
+> `Cannot GET ...`), jadi gampang di-debug:
+> `{"success":false,"error":"NOT_FOUND","message":"Route GET /x tidak terdaftar","endpoints":{...}}`
 
 ### 1. Generate QRIS
 
@@ -72,7 +131,24 @@ curl http://localhost:2234/createqris/amount=25000
 
 ---
 
-### 2. Cek Status Pembayaran
+### 2. Gambar QR (PNG)
+
+**GET** `/<checkId>.jpg` (alias: `/qris/<checkId>.jpg`)
+
+Gambar QR dirender **di server sendiri** dari `qr_string` — tidak bergantung pada `api.qrserver.com` atau layanan pihak ketiga lain.
+
+```
+curl -o qr.jpg http://192.168.1.5:2234/check_170929364739_73itqwsku.jpg
+```
+
+Spesifikasi gambar: PNG 900x900px, error correction level `M`, margin 2.
+Berlaku selama `check_id` masih aktif (15 menit, atau sampai status `PAID`).
+
+> Catatan: URL berakhiran `.jpg` tapi isinya PNG — dictated oleh `Content-Type` header, jadi tetap tampil benar di browser.
+
+---
+
+### 3. Cek Status Pembayaran
 
 **GET** `/cekpembayaran/:checkId`
 
@@ -124,14 +200,25 @@ curl http://localhost:2234/cekpembayaran/check_170929364739_73itqwsku
 
 ## PM2 Management (Production)
 
+Project sudahinclude `ecosystem.config.js`, jadi start-nya:
+
 ```bash
-pm2 status                    # Cek status semua app
-pm2 logs gopay-qris-server    # Lihat log real-time
-pm2 restart gopay-qris-server # Restart app
-pm2 stop gopay-qris-server    # Stop app
-pm2 monit                     # Dashboard monitoring
-pm2 startup                   # Auto-start saat reboot VPS
+pm2 start ecosystem.config.js       # Start (pertama kali / setelah edit)
+pm2 restart gopay-qris-server      # Restart app
+pm2 restart gopay-qris-server --update-env   # Restart + reload .env
+pm2 status gopay-qris-server       # Cek status
+pm2 logs gopay-qris-server         # Log real-time
+pm2 monit                          # Dashboard monitoring
+pm2 stop gopay-qris-server         # Stop app
+pm2 save                           # Simpan daftar process biar auto-start
+pm2 startup                        # Daemon PM2 saat boot
 ```
+
+Log ditulis ke `logs/out.log` dan `logs/error.log`.
+
+> **Penting:** `instances: 1` + `exec_mode: "fork"` itu wajib. `activeChecks` disimpan
+> di memory, jadi kalau jalan multi-instance, `/createqris` bisa nyantol di satu
+> instance sementara polling `/cekpembayaran` nyantol di instance lain -> selalu `UNPAID`.
 
 ---
 
@@ -183,6 +270,7 @@ setTimeout(() => clearInterval(interval), 15 * 60 * 1000);
 | `ACCESS_TOKEN` | Ya | JWT Access Token |
 | `REFRESH_TOKEN` | Ya | JWT Refresh Token |
 | `STATIC_QR` | Ya | Static QR string dari GoMerch |
+| `PUBLIC_URL` | Tidak | Domain publik opsional untuk `qr_image` & `check_url`. Kosongkan = otomatis pakai IP LAN server (tanpa domain/Cloudflare Tunnel) |
 | `PORT` | Tidak | Port server (default: 2234) |
 
 Copy `.env.example` ke `.env` dan isi valuenya.
@@ -192,6 +280,9 @@ Copy `.env.example` ke `.env` dan isi valuenya.
 ## Catatan
 
 - QRIS berlaku **15 menit** (timeout)
+- **Tanpa perlu domain/Cloudflare Tunnel**: biarkan `PUBLIC_URL` kosong, server otomatis
+  mendeteksi IP LAN dan `qr_image`/`check_url` bisa diakses HP di jaringan yang sama
+- Gambar QR dirender lokal (900x900 PNG, ECC `M`) — tidak ada ketergantungan ke QR generator pihak ketiga
 - Amount yang dikirim ke user sudah ditambah **unique code** (100-200) untuk identifikasi
 - Server otomatis hapus `check_id` yang expired
 - Token akses otomatis di-refresh jika expired

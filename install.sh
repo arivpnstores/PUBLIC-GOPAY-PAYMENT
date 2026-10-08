@@ -107,6 +107,9 @@ setup_env() {
         read -p "STATIC_QR (string QR dari GoMerch): " STATIC_QR
     done
     
+    read -p "PUBLIC_URL (opsional, kosongkan = auto IP LAN / tanpa domain): " PUBLIC_URL
+    PUBLIC_URL=${PUBLIC_URL%/}
+    
     read -p "PORT [2234]: " PORT
     PORT=${PORT:-2234}
     
@@ -119,6 +122,7 @@ MERCHANT_ID=$MERCHANT_ID
 ACCESS_TOKEN=$ACCESS_TOKEN
 REFRESH_TOKEN=$REFRESH_TOKEN
 STATIC_QR=$STATIC_QR
+PUBLIC_URL=$PUBLIC_URL
 PORT=$PORT
 EOF
     
@@ -134,7 +138,7 @@ start_pm2() {
     pm2 delete "$PM2_APP_NAME" 2>/dev/null || true
     
     # Start new
-    pm2 start server.js --name "$PM2_APP_NAME" --time
+    pm2 start ecosystem.config.js
     pm2 save
     
     success "Server started with PM2"
@@ -154,8 +158,18 @@ show_info() {
     echo "Server berjalan di PM2: $PM2_APP_NAME"
     echo
     echo "Endpoint:"
-    echo "  Create QRIS:  http://localhost:$PORT/createqris/amount=1000"
-    echo "  Cek Bayar:    http://localhost:$PORT/cekpembayaran/:checkId"
+    if [ -z "$PUBLIC_URL" ]; then
+        LAN_IP=$(hostname -I 2>/dev/null | awk '{print $1}')
+        BASE_SHOW="http://${LAN_IP:-localhost}:$PORT"
+    else
+        BASE_SHOW="$PUBLIC_URL"
+    fi
+    echo "  Health Check: ${BASE_SHOW}/api/v1/health"
+    echo "  Create QRIS:  ${BASE_SHOW}/createqris/amount=1000"
+    echo "  Cek Bayar:    ${BASE_SHOW}/cekpembayaran/:checkId"
+    echo "  Gambar QR:    ${BASE_SHOW}/<checkId>.jpg"
+    echo
+    echo "  Log:          logs/out.log  &  logs/error.log"
     echo
     echo "PM2 Commands:"
     echo "  pm2 status              - Cek status"
